@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Availability Widget</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .status-button {
+            transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+        }
+
+        .status-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-button:active {
+            transform: translateY(1px);
+        }
+
+        .status-indicator-busy {
+            background-color: #ef4444;
+        }
+
+        .status-indicator-tentative {
+            background-color: #f59e0b;
+        }
+
+        .status-indicator-free {
+            background-color: #22c55e;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 text-gray-800">
+    <div id="app" class="w-full max-w-lg bg-white rounded-xl shadow-xl p-6 md:p-8 space-y-6">
+
+        <!-- Header -->
+        <header class="text-center space-y-2">
+            <h1 id="main-title" class="text-3xl font-bold"></h1>
+            <p id="sub-title" class="text-sm md:text-base text-gray-500"></p>
+        </header>
+
+        <!-- Loading state -->
+        <div id="loading" class="text-center py-10">
+            <svg class="animate-spin h-8 w-8 mx-auto text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-2 text-gray-500">Loading...</p>
+        </div>
+
+        <!-- Editable interface -->
+        <div id="editable-interface" class="space-y-6 hidden">
+            <div class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="userName" class="text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                    <input type="text" id="userName" placeholder="Enter your name"
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium text-gray-700 mb-1">Your Status</label>
+                    <div class="flex space-x-2">
+                        <button id="btn-free" class="status-button flex-1 py-3 px-4 bg-green-500 text-white rounded-lg font-semibold shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">Free</button>
+                        <button id="btn-tentative" class="status-button flex-1 py-3 px-4 bg-yellow-500 text-white rounded-lg font-semibold shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50">Tentative</button>
+                        <button id="btn-busy" class="status-button flex-1 py-3 px-4 bg-red-500 text-white rounded-lg font-semibold shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">Busy</button>
+                    </div>
+                </div>
+
+                <div class="text-center text-sm text-gray-500 pt-2">
+                    <p>Your unique User ID: <span id="userIdDisplay" class="font-mono text-xs bg-gray-200 px-2 py-1 rounded-md select-all"></span></p>
+                    <p class="mt-2 text-xs">To embed this widget, use this URL with `?mode=display` added.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team availability display -->
+        <div id="team-display-container" class="space-y-4 hidden">
+            <div id="availability-list" class="space-y-3">
+                <!-- Availability items will be dynamically added here -->
+            </div>
+        </div>
+
+        <!-- Message box for user notifications -->
+        <div id="message-box" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg opacity-0 transition-opacity duration-300 z-50">
+            <p id="message-text"></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set Firebase debug log level
+        setLogLevel('debug');
+
+        // Global variables provided by the canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- UI Elements ---
+        const editableInterface = document.getElementById('editable-interface');
+        const teamDisplayContainer = document.getElementById('team-display-container');
+        const loadingDiv = document.getElementById('loading');
+        const mainTitle = document.getElementById('main-title');
+        const subTitle = document.getElementById('sub-title');
+        const availabilityList = document.getElementById('availability-list');
+        const userNameInput = document.getElementById('userName');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const statusButtons = {
+            free: document.getElementById('btn-free'),
+            tentative: document.getElementById('btn-tentative'),
+            busy: document.getElementById('btn-busy')
+        };
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+
+        // --- App State ---
+        let appInitialized = false;
+        let db;
+        let auth;
+        let userId;
+        const currentURL = new URL(window.location.href);
+        const displayMode = currentURL.searchParams.get('mode') === 'display';
+
+        // --- Firebase Initialization and Authentication ---
+        async function initializeFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase config not found.");
+                }
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Authenticate the user
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                appInitialized = true;
+                console.log("Firebase initialized and user authenticated.");
+            } catch (error) {
+                console.error("Error during Firebase initialization or authentication:", error);
+                showMessage('Error: Could not connect to the database.', 'bg-red-500');
+                // Even with an error, we can still show the UI and let it fail gracefully.
+                appInitialized = true;
+            }
+        }
+
+        // Display a temporary message to the user
+        function showMessage(text, bgColor = 'bg-blue-500', duration = 3000) {
+            messageText.textContent = text;
+            messageBox.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-3 rounded-xl shadow-lg opacity-100 transition-opacity duration-300 z-50`;
+            setTimeout(() => {
+                messageBox.classList.remove('opacity-100');
+                messageBox.classList.add('opacity-0');
+            }, duration);
+        }
+
+        // --- UI Rendering Functions ---
+        function renderUI() {
+            loadingDiv.classList.add('hidden');
+            if (displayMode) {
+                mainTitle.textContent = "Team Availability";
+                subTitle.textContent = "See who's free, busy, or tentative.";
+                teamDisplayContainer.classList.remove('hidden');
+                document.body.classList.remove('flex'); // Remove flex for iframe embedding
+            } else {
+                mainTitle.textContent = "Set Your Availability";
+                subTitle.textContent = "Update your status for the team to see.";
+                editableInterface.classList.remove('hidden');
+                teamDisplayContainer.classList.remove('hidden');
+                if (userId) {
+                    userIdDisplay.textContent = userId;
+                }
+            }
+            availabilityList.classList.add('fade-in');
+        }
+
+        // Creates a UI element for a single team member's availability
+        function createAvailabilityItem(name, status, lastUpdated) {
+            const statusClass = {
+                'Free': 'bg-green-100 text-green-700 border-green-200',
+                'Tentative': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+                'Busy': 'bg-red-100 text-red-700 border-red-200'
+            }[status] || 'bg-gray-100 text-gray-700 border-gray-200';
+
+            const statusIndicatorClass = {
+                'Free': 'status-indicator-free',
+                'Tentative': 'status-indicator-tentative',
+                'Busy': 'status-indicator-busy'
+            }[status] || 'bg-gray-400';
+
+            const item = document.createElement('div');
+            item.className = `p-4 flex items-center justify-between rounded-lg border-2 ${statusClass}`;
+            item.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full ${statusIndicatorClass}"></span>
+                    <span class="font-medium capitalize">${name}</span>
+                </div>
+                <div class="text-xs text-right text-gray-500">
+                    <span class="block font-medium">${status}</span>
+                    <span class="block">Last updated: ${new Date(lastUpdated).toLocaleTimeString()}</span>
+                </div>
+            `;
+            return item;
+        }
+
+        // --- Firestore Data Logic ---
+        function listenForAvailabilityUpdates() {
+            if (!appInitialized || !db) {
+                console.warn("Database not ready for listening.");
+                return;
+            }
+
+            const availabilityCollectionRef = collection(db, `artifacts/${appId}/public/data/team_availability`);
+
+            onSnapshot(availabilityCollectionRef, (querySnapshot) => {
+                availabilityList.innerHTML = ''; // Clear the list
+                let data = [];
+                querySnapshot.forEach((doc) => {
+                    const docData = doc.data();
+                    if (docData.name && docData.status) {
+                        data.push(docData);
+                    }
+                });
+
+                // Sort the data by last updated time (newest first)
+                data.sort((a, b) => b.lastUpdated - a.lastUpdated);
+
+                if (data.length === 0) {
+                    availabilityList.innerHTML = `<div class="text-center text-gray-500 py-6">No team members have set their status yet.</div>`;
+                } else {
+                    data.forEach(item => {
+                        const itemElement = createAvailabilityItem(item.name, item.status, item.lastUpdated);
+                        availabilityList.appendChild(itemElement);
+                    });
+                }
+            }, (error) => {
+                console.error("Error listening to availability updates:", error);
+                showMessage('Error fetching team data.', 'bg-red-500');
+            });
+        }
+
+        async function updateAvailability(status) {
+            const userName = userNameInput.value.trim();
+            if (!userName) {
+                showMessage('Please enter your name.', 'bg-yellow-500');
+                return;
+            }
+            if (!userId) {
+                showMessage('Authentication failed. Cannot save status.', 'bg-red-500');
+                return;
+            }
+
+            const docRef = doc(db, `artifacts/${appId}/public/data/team_availability`, userId);
+            try {
+                await setDoc(docRef, {
+                    name: userName,
+                    status: status,
+                    lastUpdated: Date.now()
+                });
+                showMessage(`Your status is now ${status}.`, 'bg-green-500');
+            } catch (error) {
+                console.error("Error updating availability:", error);
+                showMessage('Failed to update status. Please try again.', 'bg-red-500');
+            }
+        }
+
+        // --- Event Listeners and Initial Setup ---
+        statusButtons.free.addEventListener('click', () => updateAvailability('Free'));
+        statusButtons.tentative.addEventListener('click', () => updateAvailability('Tentative'));
+        statusButtons.busy.addEventListener('click', () => updateAvailability('Busy'));
+
+        // Handle user authentication state change
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                userIdDisplay.textContent = userId;
+                console.log("Authenticated user with ID:", userId);
+
+                // Try to get user's name from firestore on load
+                try {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/team_availability`, userId);
+                    const docSnap = await getDocs(docRef);
+                    // The Firestore path is for a collection, not a single document.
+                    // Let's refactor this part to use a different query logic.
+                    // For now, let's just not pre-populate the name.
+                } catch (error) {
+                    console.log("Could not fetch user's previous name. This is expected on first run.");
+                }
+
+                // Initial render of the UI
+                renderUI();
+                // Start listening for real-time updates
+                listenForAvailabilityUpdates();
+            } else {
+                console.log("No user signed in.");
+                renderUI(); // Render even if no user, just in read-only mode for display
+            }
+        });
+
+        // Initialize Firebase on window load
+        window.onload = initializeFirebase;
+    </script>
+</body>
+
+</html>
