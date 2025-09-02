@@ -20,6 +20,9 @@
         .status-busy {
             background-color: #ef4444;
         }
+        .status-virtual {
+            background-color: #1190F2;
+        }
         .status-unknown {
             background-color: #94a3b8;
         }
@@ -97,6 +100,10 @@
                         statusClass = 'status-busy';
                         statusText = 'Busy';
                         break;
+                    case 'virtual':
+                        statusClass = 'status-virtual';
+                        statusText = 'Virtual';
+                        break;
                     default:
                         statusClass = 'status-unknown';
                         statusText = 'Not Present';
@@ -126,6 +133,7 @@
     </script>
 </body>
 </html>
+
 
 
 
