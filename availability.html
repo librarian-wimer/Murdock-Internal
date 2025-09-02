@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Availability</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent;
+        }
+        .status-free {
+            background-color: #22c55e;
+        }
+        .status-tentative {
+            background-color: #f59e0b;
+        }
+        .status-busy {
+            background-color: #ef4444;
+        }
+        .status-unknown {
+            background-color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-8">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center justify-between border-b pb-4 mb-4">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-800">Team Availability</h2>
+            <button id="refreshButton" class="px-3 py-1.5 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 ease-in-out">
+                Refresh
+            </button>
+        </div>
+        
+        <div id="availability-list" class="space-y-4">
+            <!-- Availability items will be rendered here -->
+            <div class="flex items-center justify-center p-8">
+                <div class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                    <p class="mt-2 text-gray-500 text-sm font-medium">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwN_t0_zR7hpzHTXbbZxNhnRmZAMrzX71xfKNYrOEAFRZoVXs8VpFe3sOUs2eaVktQx/exec';
+        const refreshButton = document.getElementById('refreshButton');
+        const availabilityList = document.getElementById('availability-list');
+
+        const fetchAvailability = async () => {
+            availabilityList.innerHTML = `
+                <div class="flex items-center justify-center p-8">
+                    <div class="flex flex-col items-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        <p class="mt-2 text-gray-500 text-sm font-medium">Loading...</p>
+                    </div>
+                </div>
+            `;
+            try {
+                const response = await fetch(APPS_SCRIPT_URL);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                renderAvailability(data);
+            } catch (error) {
+                console.error('Failed to fetch availability:', error);
+                availabilityList.innerHTML = `<p class="text-center text-red-500 font-semibold p-8">Error loading data. Please try again later.</p>`;
+            }
+        };
+
+        const renderAvailability = (data) => {
+            availabilityList.innerHTML = '';
+            if (data.length === 0) {
+                availabilityList.innerHTML = `<p class="text-center text-gray-500 p-8">No team members found.</p>`;
+                return;
+            }
+
+            data.forEach(member => {
+                const status = member.status ? member.status.toLowerCase() : 'unknown';
+                let statusClass = '';
+                let statusText = '';
+                
+                switch (status) {
+                    case 'free':
+                        statusClass = 'status-free';
+                        statusText = 'Free';
+                        break;
+                    case 'tentative':
+                        statusClass = 'status-tentative';
+                        statusText = 'Tentative';
+                        break;
+                    case 'busy':
+                        statusClass = 'status-busy';
+                        statusText = 'Busy';
+                        break;
+                    default:
+                        statusClass = 'status-unknown';
+                        statusText = 'Unknown';
+                        break;
+                }
+
+                const memberElement = document.createElement('div');
+                memberElement.className = 'flex items-center space-x-4 border-b pb-2 last:border-b-0 last:pb-0';
+                memberElement.innerHTML = `
+                    <div class="w-2.5 h-2.5 rounded-full ${statusClass} flex-shrink-0"></div>
+                    <div class="flex-grow">
+                        <p class="text-base font-semibold text-gray-700">${member.name}</p>
+                    </div>
+                    <p class="text-xs font-medium text-gray-500 flex-shrink-0">
+                        ${member.lastupdated ? `Updated: ${new Date(member.lastupdated).toLocaleTimeString()}` : ''}
+                    </p>
+                `;
+                availabilityList.appendChild(memberElement);
+            });
+        };
+
+        document.addEventListener('DOMContentLoaded', fetchAvailability);
+        refreshButton.addEventListener('click', fetchAvailability);
+
+        // Optional: auto-refresh every 60 seconds
+        setInterval(fetchAvailability, 60000); 
+    </script>
+</body>
+</html>
