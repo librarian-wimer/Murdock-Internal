@@ -30,6 +30,13 @@
             transform: translateY(1px);
         }
 
+        .status-button[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .status-indicator-busy {
             background-color: #ef4444;
         }
@@ -88,9 +95,9 @@
                 <div class="flex flex-col">
                     <label class="text-sm font-medium text-gray-700 mb-1">Your Status</label>
                     <div class="flex space-x-2">
-                        <button id="btn-free" class="status-button flex-1 py-3 px-4 bg-green-500 text-white rounded-lg font-semibold shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">Free</button>
-                        <button id="btn-tentative" class="status-button flex-1 py-3 px-4 bg-yellow-500 text-white rounded-lg font-semibold shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50">Tentative</button>
-                        <button id="btn-busy" class="status-button flex-1 py-3 px-4 bg-red-500 text-white rounded-lg font-semibold shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">Busy</button>
+                        <button id="btn-free" disabled class="status-button flex-1 py-3 px-4 bg-green-500 text-white rounded-lg font-semibold shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">Free</button>
+                        <button id="btn-tentative" disabled class="status-button flex-1 py-3 px-4 bg-yellow-500 text-white rounded-lg font-semibold shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50">Tentative</button>
+                        <button id="btn-busy" disabled class="status-button flex-1 py-3 px-4 bg-red-500 text-white rounded-lg font-semibold shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">Busy</button>
                     </div>
                 </div>
 
@@ -184,6 +191,11 @@
                         // Note: The previous getDocs call was incorrect because it was treating a
                         // document path as a collection path. This block is not essential for
                         // the app's core functionality, so it has been removed to avoid errors.
+
+                        // After authentication, enable the status buttons
+                        if (statusButtons.free) statusButtons.free.disabled = false;
+                        if (statusButtons.tentative) statusButtons.tentative.disabled = false;
+                        if (statusButtons.busy) statusButtons.busy.disabled = false;
 
                         // Initial render of the UI
                         renderUI();
