@@ -163,10 +163,15 @@
 
         // --- Firebase Initialization and Authentication ---
         async function initializeFirebase() {
+            // Check for missing config before trying to initialize Firebase
+            if (Object.keys(firebaseConfig).length === 0) {
+                console.error("Firebase config is missing. Cannot initialize Firebase.");
+                showMessage('Error: Missing Firebase configuration. Please check the environment settings.', 'bg-red-500');
+                loadingDiv.classList.add('hidden');
+                return; // Exit the function early
+            }
+
             try {
-                if (Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("Firebase config not found.");
-                }
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -187,7 +192,7 @@
                         userId = user.uid;
                         userIdDisplay.textContent = userId;
                         console.log("Authenticated user with ID:", userId);
-                        
+
                         // Note: The previous getDocs call was incorrect because it was treating a
                         // document path as a collection path. This block is not essential for
                         // the app's core functionality, so it has been removed to avoid errors.
